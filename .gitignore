@@ -1,0 +1,14 @@
+# Local-only verification images
+/local-test/
+/test/
+
+# Generated downloads and temporary files
+*.zip
+*.log
+*.tmp
+*.temp
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+desktop.ini

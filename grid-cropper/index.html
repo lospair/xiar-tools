@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Grid Cropper</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <h1>Grid Cropper</h1>
+          <p id="statusText" class="status-pill" aria-live="polite">現在 0件 / 全体 0件</p>
+        </div>
+      </div>
+
+      <div class="top-actions">
+        <label class="button primary" for="fileInput" title="画像ファイルを選択します。複数選択できます。">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 18.5v-13Zm2 0v9.7l3.2-3.2a1.4 1.4 0 0 1 2 0l1.7 1.7 3.6-4.4a1.4 1.4 0 0 1 2.1 0L20 11V5.5a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5Zm3.3 2.3a1.7 1.7 0 1 1 3.4 0 1.7 1.7 0 0 1-3.4 0Z"/></svg>
+          画像選択
+        </label>
+        <input id="fileInput" type="file" accept="image/*" multiple>
+
+        <button id="detectButton" type="button" title="現在の画像から白い区切り線を検出して候補を作り直します。手動編集済みの場合は確認します。">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 9.8 8.2 4 10.4l5.8 2.2L12 19l2.2-6.4 5.8-2.2-5.8-2.2L12 2Zm6.5 12.5-1 2.8-2.8 1 2.8 1 1 2.7 1-2.7 2.8-1-2.8-1-1-2.8ZM5.5 15l-.8 2.1-2.2.8 2.2.8.8 2.1.8-2.1 2.2-.8-2.2-.8-.8-2.1Z"/></svg>
+          自動検出
+        </button>
+
+        <button id="addRegionButton" type="button" title="選択中またはいずれかの候補と同じ大きさの矩形を、空いている隣接位置へ追加します。">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z"/></svg>
+          矩形追加
+        </button>
+
+        <button id="deleteRegionButton" type="button" title="選択中の矩形候補を削除します。">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8l1 2h4v2H3V6h4l1-2Zm1 6h2v8H9v-8Zm4 0h2v8h-2v-8ZM6 10h12l-.7 10.1A2 2 0 0 1 15.3 22H8.7a2 2 0 0 1-2-1.9L6 10Z"/></svg>
+          矩形削除
+        </button>
+
+        <button id="exportButton" type="button" title="共有シート、選択フォルダーへのPNG保存、ZIP保存の順に使える方法で出力します。">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 8.6 6.4 10 7.8l1-1V15h2V6.8l1 1 1.4-1.4L12 3ZM5 13h2v5h10v-5h2v5.5A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5V13Z"/></svg>
+          エクスポート
+        </button>
+      </div>
+    </header>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <main class="app-layout">
+      <aside class="panel source-panel">
+        <section id="dropZone" class="drop-zone" tabindex="0" title="クリックで画像選択、またはドラッグ&ドロップできます。">
+          <strong>画像をドロップ</strong>
+          <span>クリックでも選択できます</span>
+          <small>PNG / JPEG</small>
+        </section>
+
+        <section class="panel-section">
+          <h2 id="sourceHeading">画像 0枚</h2>
+          <div id="sourceList" class="source-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-title-row">
+            <h2>検出</h2>
+            <button id="detectSettingsButton" class="small-button" type="button" title="現在の検出パラメーターで再検出します。">再検出</button>
+          </div>
+          <div class="settings-grid">
+            <label title="区切り線として扱う白さの下限です。RGB値で指定します。">
+              白しきい値 (RGB)
+              <input id="whiteThresholdInput" type="number" min="180" max="255" step="1" value="245" title="単位: RGB値 0-255">
+            </label>
+            <label title="背景色との近さを判定する幅です。RGB差で指定します。">
+              許容差 (RGB)
+              <input id="toleranceInput" type="number" min="0" max="80" step="1" value="18" title="単位: RGB差">
+            </label>
+            <label title="線として採用するために、行または列のどれだけが白系であるべきかを指定します。">
+              線カバー率 (比率)
+              <input id="lineCoverageInput" type="number" min="0.70" max="1" step="0.01" value="0.96" title="単位: 0-1 の比率">
+            </label>
+            <label title="区切り線や外周余白として扱う最大の太さです。縦線は画像幅、横線は画像高さに対する割合です。">
+              最大線幅 (%)
+              <input id="maxLineThicknessInput" type="number" min="0.2" max="8" step="0.1" value="2.6" title="単位: 画像幅または高さに対するパーセント">
+            </label>
+            <label title="この値より細い矩形候補は無視します。">
+              最小辺 (px)
+              <input id="minSideInput" type="number" min="1" max="400" step="1" value="64" title="単位: ピクセル">
+            </label>
+            <label title="画像全体に対してこの値より小さい面積の候補は無視します。">
+              最小面積率 (比率)
+              <input id="minAreaRatioInput" type="number" min="0" max="0.1" step="0.001" value="0.005" title="単位: 画像全体に対する比率">
+            </label>
+          </div>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <div class="stage-tools">
+          <button id="fitButton" class="small-button" type="button" title="画像全体が見える倍率にします。">全体</button>
+          <button id="actualSizeButton" class="small-button" type="button" title="元画像の1ピクセルを画面上の1ピクセルで表示します。">100%</button>
+          <button id="zoomOutButton" class="small-button icon-only" type="button" title="縮小">-</button>
+          <label class="zoom-slider" title="ホイール回転でもズームできます。">
+            <span>倍率</span>
+            <input id="zoomInput" type="range" min="10" max="800" step="5" value="100">
+          </label>
+          <button id="zoomInButton" class="small-button icon-only" type="button" title="拡大">+</button>
+          <button id="pixelButton" class="small-button" type="button" title="ピクセルを補間せずに表示します。押すと確認しやすい倍率まで拡大します。">ピクセル表示</button>
+          <button id="snapButton" class="small-button" type="button" aria-pressed="true" title="ハンドルのドラッグ中に、他の矩形端や分割線へ吸着します。Altキーを押している間は一時的に無効です。">スナップ</button>
+        </div>
+
+        <div id="viewport" class="viewport" tabindex="0" title="ホイールでズーム、ホイールボタンのドラッグでパンできます。">
+          <div id="stage" class="stage empty">
+            <canvas id="imageCanvas"></canvas>
+            <svg id="overlay" xmlns="http://www.w3.org/2000/svg" aria-label="切り抜き領域"></svg>
+          </div>
+          <canvas id="loupe" class="loupe" width="180" height="180" title="ドラッグ後のハンドルは、このズーム領域でも微調整できます。"></canvas>
+        </div>
+      </section>
+
+      <aside class="panel region-panel">
+        <section class="panel-section">
+          <h2>選択矩形</h2>
+          <div class="coord-grid">
+            <label title="切り抜き矩形の左端です。">
+              左 (px)
+              <input id="xInput" type="number" step="1" title="単位: ピクセル">
+            </label>
+            <label title="切り抜き矩形の上端です。">
+              上 (px)
+              <input id="yInput" type="number" step="1" title="単位: ピクセル">
+            </label>
+            <label title="切り抜き矩形の幅です。">
+              幅 (px)
+              <input id="wInput" type="number" min="1" step="1" title="単位: ピクセル">
+            </label>
+            <label title="切り抜き矩形の高さです。">
+              高さ (px)
+              <input id="hInput" type="number" min="1" step="1" title="単位: ピクセル">
+            </label>
+          </div>
+        </section>
+
+        <section class="panel-section region-list-section">
+          <h2 id="regionHeading">候補 0件</h2>
+          <div id="regionList" class="region-list" aria-live="polite"></div>
+        </section>
+      </aside>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
