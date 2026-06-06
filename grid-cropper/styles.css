@@ -383,6 +383,7 @@ h2 {
   position: relative;
   min-height: 0;
   overflow: auto;
+  touch-action: none;
   background:
     linear-gradient(45deg, #e4e0d8 25%, transparent 25%),
     linear-gradient(-45deg, #e4e0d8 25%, transparent 25%),

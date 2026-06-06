@@ -35,6 +35,8 @@ const state = {
   pixelated: false,
   snapEnabled: true,
   drag: null,
+  activePointers: new Map(),
+  touchGesture: null,
   activeHandle: null,
   loupe: null,
   loupeHideTimer: null,
@@ -127,6 +129,11 @@ function sanitizeFileName(name) {
   return /\.png$/i.test(cleaned) ? cleaned : `${cleaned || "crop"}.png`;
 }
 
+function isLikelyImageFile(file) {
+  return file.type.startsWith("image/")
+    || /\.(png|jpe?g|webp|gif|bmp|heic|heif)$/i.test(file.name || "");
+}
+
 function readDetectionSettings() {
   return {
     whiteThreshold: clamp(Number(el.whiteThresholdInput.value) || DetectionDefaults.whiteThreshold, 0, 255),
@@ -167,7 +174,7 @@ function renderAll() {
 }
 
 async function loadFiles(files) {
-  const imageFiles = Array.from(files || []).filter((file) => file.type.startsWith("image/"));
+  const imageFiles = Array.from(files || []).filter(isLikelyImageFile);
   if (imageFiles.length === 0) return;
 
   const loaded = [];
@@ -202,11 +209,8 @@ async function createSource(file) {
     img.onerror = reject;
   });
   img.src = objectUrl;
-  if (img.decode) {
-    await Promise.race([img.decode(), loaded]);
-  } else {
-    await loaded;
-  }
+  await loaded;
+  if (img.decode) await img.decode().catch(() => {});
 
   return {
     id: nextId("source"),
@@ -311,6 +315,7 @@ function updateControls() {
     el.hInput.value = region.height;
   }
   el.snapButton.setAttribute("aria-pressed", String(state.snapEnabled));
+  el.pixelButton.setAttribute("aria-pressed", String(!state.pixelated));
   withDisabledExport(false);
   updateStatusCounts();
 }
@@ -1355,6 +1360,112 @@ function tryPointerCapture(target, pointerId) {
   }
 }
 
+function rememberPointer(event) {
+  if (event.pointerType !== "touch") return false;
+  state.activePointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+  if (state.activePointers.size >= 2) {
+    startTouchGesture(event);
+    return true;
+  }
+  return false;
+}
+
+function updatePointerPosition(event) {
+  if (event.pointerType !== "touch" || !state.activePointers.has(event.pointerId)) return;
+  state.activePointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+}
+
+function forgetPointer(event) {
+  if (event.pointerType !== "touch") return;
+  state.activePointers.delete(event.pointerId);
+  if (state.activePointers.size < 2) {
+    state.touchGesture = null;
+  } else if (state.touchGesture) {
+    startTouchGesture(event);
+  }
+}
+
+function firstTwoTouchPoints() {
+  return Array.from(state.activePointers.values()).slice(0, 2);
+}
+
+function touchCenter(points) {
+  return {
+    x: (points[0].clientX + points[1].clientX) / 2,
+    y: (points[0].clientY + points[1].clientY) / 2
+  };
+}
+
+function touchDistance(points) {
+  return Math.hypot(points[0].clientX - points[1].clientX, points[0].clientY - points[1].clientY);
+}
+
+function startTouchGesture(event) {
+  const source = currentSource();
+  if (!source) return;
+  event.preventDefault();
+  event.stopPropagation();
+  cancelCurrentDragForGesture();
+  const points = firstTwoTouchPoints();
+  if (points.length < 2) return;
+  const center = touchCenter(points);
+  const image = clientToImage(center.x, center.y);
+  state.touchGesture = {
+    startDistance: Math.max(1, touchDistance(points)),
+    startZoom: state.zoom,
+    imageX: image.x,
+    imageY: image.y
+  };
+}
+
+function updateTouchGesture(event) {
+  if (!state.touchGesture || state.activePointers.size < 2) return false;
+  event.preventDefault();
+  const source = currentSource();
+  if (!source) return true;
+  const points = firstTwoTouchPoints();
+  const center = touchCenter(points);
+  const distance = Math.max(1, touchDistance(points));
+  state.zoom = clamp(state.touchGesture.startZoom * distance / state.touchGesture.startDistance, 0.1, 8);
+  el.zoomInput.value = String(Math.round(state.zoom * 100));
+  renderCanvas();
+  renderOverlay();
+
+  const viewportRect = el.viewport.getBoundingClientRect();
+  el.viewport.scrollLeft = el.stage.offsetLeft + state.touchGesture.imageX * state.zoom - (center.x - viewportRect.left);
+  el.viewport.scrollTop = el.stage.offsetTop + state.touchGesture.imageY * state.zoom - (center.y - viewportRect.top);
+  return true;
+}
+
+function cancelCurrentDragForGesture() {
+  if (!state.drag) return;
+  const source = state.sources.find((item) => item.id === state.drag.sourceId);
+  if (source && (state.drag.type === "move" || state.drag.type === "resize")) {
+    const region = source.regions.find((item) => item.id === state.drag.regionId);
+    if (region) Object.assign(region, state.drag.original);
+  }
+  if (source && state.drag.type === "line") {
+    const line = source.splitLines.find((item) => item.id === state.drag.lineId);
+    if (line) Object.assign(line, state.drag.originalLine);
+    source.regions.splice(0, source.regions.length, ...state.drag.originalRegions.map((region) => ({ ...region })));
+  }
+  state.drag = null;
+  el.overlay.querySelectorAll(".split-line.dragging").forEach((node) => node.classList.remove("dragging"));
+  el.loupe.classList.remove("dragging");
+  renderOverlay();
+  renderRegionList();
+  updateControls();
+}
+
+function hasDragStarted(event, drag, threshold = null) {
+  if (drag.started) return true;
+  const limit = threshold ?? (drag.pointerType === "touch" ? 8 : 2);
+  const distance = Math.hypot(event.clientX - drag.clientStartX, event.clientY - drag.clientStartY);
+  if (distance < limit) return false;
+  drag.started = true;
+  return true;
+}
+
 function startViewportPan(event) {
   event.preventDefault();
   event.stopPropagation();
@@ -1363,6 +1474,8 @@ function startViewportPan(event) {
   state.drag = {
     type: "pan",
     pointerId: event.pointerId,
+    pointerType: event.pointerType,
+    started: true,
     clientX: event.clientX,
     clientY: event.clientY,
     scrollLeft: el.viewport.scrollLeft,
@@ -1371,6 +1484,7 @@ function startViewportPan(event) {
 }
 
 function onRegionPointerDown(event) {
+  if (rememberPointer(event)) return;
   if (event.button === 1) {
     startViewportPan(event);
     return;
@@ -1382,11 +1496,20 @@ function onRegionPointerDown(event) {
 
   event.preventDefault();
   event.stopPropagation();
+  const alreadySelected = region.id === state.selectedRegionId;
   selectRegion(region.id);
+  if (!alreadySelected) {
+    if (event.pointerType === "touch") startViewportPan(event);
+    return;
+  }
   clearActiveHandle();
   state.drag = {
     type: "move",
     pointerId: event.pointerId,
+    pointerType: event.pointerType,
+    started: false,
+    clientStartX: event.clientX,
+    clientStartY: event.clientY,
     start: clientToImage(event.clientX, event.clientY),
     sourceId: source.id,
     regionId: region.id,
@@ -1396,6 +1519,7 @@ function onRegionPointerDown(event) {
 }
 
 function onHandlePointerDown(event) {
+  if (rememberPointer(event)) return;
   if (event.button === 1) {
     startViewportPan(event);
     return;
@@ -1413,6 +1537,10 @@ function onHandlePointerDown(event) {
   state.drag = {
     type: "resize",
     pointerId: event.pointerId,
+    pointerType: event.pointerType,
+    started: false,
+    clientStartX: event.clientX,
+    clientStartY: event.clientY,
     handle,
     start: clientToImage(event.clientX, event.clientY),
     sourceId: source.id,
@@ -1425,6 +1553,7 @@ function onHandlePointerDown(event) {
 }
 
 function onLinePointerDown(event) {
+  if (rememberPointer(event)) return;
   if (event.button === 1) {
     startViewportPan(event);
     return;
@@ -1439,6 +1568,10 @@ function onLinePointerDown(event) {
   state.drag = {
     type: "line",
     pointerId: event.pointerId,
+    pointerType: event.pointerType,
+    started: false,
+    clientStartX: event.clientX,
+    clientStartY: event.clientY,
     start: clientToImage(event.clientX, event.clientY),
     sourceId: source.id,
     lineId: line.id,
@@ -1450,6 +1583,7 @@ function onLinePointerDown(event) {
 }
 
 function onOverlayPointerDown(event) {
+  if (rememberPointer(event)) return;
   if (event.button === 1) {
     startViewportPan(event);
     return;
@@ -1461,6 +1595,9 @@ function onOverlayPointerDown(event) {
 }
 
 function onPointerMove(event) {
+  updatePointerPosition(event);
+  if (updateTouchGesture(event)) return;
+
   if (state.drag?.type === "resize" && state.drag.pointerId === event.pointerId) {
     updateResizeDrag(event);
     return;
@@ -1484,6 +1621,7 @@ function onPointerMove(event) {
   const dy = Math.round(current.y - state.drag.start.y);
 
   if (state.drag.type === "move") {
+    if (!hasDragStarted(event, state.drag)) return;
     const region = source.regions.find((item) => item.id === state.drag.regionId);
     if (!region) return;
     Object.assign(region, state.drag.original);
@@ -1495,6 +1633,7 @@ function onPointerMove(event) {
   }
 
   if (state.drag.type === "line") {
+    if (!hasDragStarted(event, state.drag)) return;
     applyLineDrag(source, dx, dy);
     renderOverlay();
     renderRegionList();
@@ -1506,6 +1645,7 @@ function updateResizeDrag(event) {
   const source = state.sources.find((item) => item.id === state.drag.sourceId);
   const region = source?.regions.find((item) => item.id === state.drag.regionId);
   if (!source || !region) return;
+  if (!hasDragStarted(event, state.drag, state.drag.fromLoupe ? 2 : null)) return;
   let dx;
   let dy;
   if (state.drag.fromLoupe) {
@@ -1527,9 +1667,12 @@ function updateResizeDrag(event) {
 }
 
 function onPointerUp(event) {
-  if (!state.drag || state.drag.pointerId !== event.pointerId) return;
+  if (!state.drag || state.drag.pointerId !== event.pointerId) {
+    forgetPointer(event);
+    return;
+  }
   const finished = state.drag;
-  if (["move", "resize", "line"].includes(finished.type)) {
+  if (["move", "resize", "line"].includes(finished.type) && finished.started) {
     markManualEdit(state.sources.find((source) => source.id === finished.sourceId));
   }
   state.drag = null;
@@ -1546,6 +1689,14 @@ function onPointerUp(event) {
     if (region) drawHandleLoupe(region, finished.handle, false);
   }
   renderOverlay();
+  forgetPointer(event);
+}
+
+function onPointerCancel(event) {
+  if (state.drag?.pointerId === event.pointerId) {
+    cancelCurrentDragForGesture();
+  }
+  forgetPointer(event);
 }
 
 function applyLineDrag(source, dx, dy) {
@@ -1946,7 +2097,7 @@ function registerEvents() {
   el.pixelButton.addEventListener("click", () => {
     state.pixelated = !state.pixelated;
     el.canvas.classList.toggle("pixelated", state.pixelated);
-    if (state.pixelated && state.zoom < 3) setZoom(4);
+    updateControls();
   });
   el.snapButton.addEventListener("click", () => {
     state.snapEnabled = !state.snapEnabled;
@@ -1962,6 +2113,11 @@ function registerEvents() {
 
   el.overlay.addEventListener("pointerdown", onOverlayPointerDown);
   el.viewport.addEventListener("pointerdown", (event) => {
+    if (rememberPointer(event)) return;
+    if (event.pointerType === "touch" && event.target === el.viewport) {
+      startViewportPan(event);
+      return;
+    }
     if (event.button === 1) startViewportPan(event);
   });
   el.viewport.addEventListener("auxclick", (event) => {
@@ -1977,6 +2133,7 @@ function registerEvents() {
   el.loupe.addEventListener("pointerdown", onLoupePointerDown);
   document.addEventListener("pointermove", onPointerMove);
   document.addEventListener("pointerup", onPointerUp);
+  document.addEventListener("pointercancel", onPointerCancel);
   el.viewport.addEventListener("keydown", (event) => {
     if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
     event.preventDefault();

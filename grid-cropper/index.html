@@ -17,10 +17,6 @@
       </div>
 
       <div class="top-actions">
-        <label class="button primary" for="fileInput" title="画像ファイルを選択します。複数選択できます。">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 18.5v-13Zm2 0v9.7l3.2-3.2a1.4 1.4 0 0 1 2 0l1.7 1.7 3.6-4.4a1.4 1.4 0 0 1 2.1 0L20 11V5.5a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5Zm3.3 2.3a1.7 1.7 0 1 1 3.4 0 1.7 1.7 0 0 1-3.4 0Z"/></svg>
-          画像選択
-        </label>
         <input id="fileInput" type="file" accept="image/*" multiple>
 
         <button id="detectButton" type="button" title="現在の画像から白い区切り線を検出して候補を作り直します。手動編集済みの場合は確認します。">
@@ -49,10 +45,10 @@
 
     <main class="app-layout">
       <aside class="panel source-panel">
-        <section id="dropZone" class="drop-zone" tabindex="0" title="クリックで画像選択、またはドラッグ&ドロップできます。">
-          <strong>画像をドロップ</strong>
-          <span>クリックでも選択できます</span>
-          <small>PNG / JPEG</small>
+        <section id="dropZone" class="drop-zone" tabindex="0" role="button" title="タップまたはクリックで画像を選択できます。PCではドラッグ&ドロップも使えます。">
+          <strong>画像を選択</strong>
+          <span>タップ・クリック、またはドロップ</span>
+          <small>PNG / JPEG / WebP</small>
         </section>
 
         <section class="panel-section">
@@ -97,18 +93,18 @@
       <section class="workspace">
         <div class="stage-tools">
           <button id="fitButton" class="small-button" type="button" title="画像全体が見える倍率にします。">全体</button>
-          <button id="actualSizeButton" class="small-button" type="button" title="元画像の1ピクセルを画面上の1ピクセルで表示します。">100%</button>
+          <button id="actualSizeButton" class="small-button" type="button" title="元画像の1ピクセルを画面上の1ピクセルで表示します。">ピクセル等倍</button>
           <button id="zoomOutButton" class="small-button icon-only" type="button" title="縮小">-</button>
           <label class="zoom-slider" title="ホイール回転でもズームできます。">
             <span>倍率</span>
             <input id="zoomInput" type="range" min="10" max="800" step="5" value="100">
           </label>
           <button id="zoomInButton" class="small-button icon-only" type="button" title="拡大">+</button>
-          <button id="pixelButton" class="small-button" type="button" title="ピクセルを補間せずに表示します。押すと確認しやすい倍率まで拡大します。">ピクセル表示</button>
+          <button id="pixelButton" class="small-button" type="button" aria-pressed="true" title="オンのときは拡大表示を滑らかにします。オフにするとピクセル境界をくっきり表示します。">ピクセルぼかし</button>
           <button id="snapButton" class="small-button" type="button" aria-pressed="true" title="ハンドルのドラッグ中に、他の矩形端や分割線へ吸着します。Altキーを押している間は一時的に無効です。">スナップ</button>
         </div>
 
-        <div id="viewport" class="viewport" tabindex="0" title="ホイールでズーム、ホイールボタンのドラッグでパンできます。">
+        <div id="viewport" class="viewport" tabindex="0" title="ホイールでズーム、ホイールボタンのドラッグでパンできます。タッチ操作では2本指でパンとズームができます。">
           <div id="stage" class="stage empty">
             <canvas id="imageCanvas"></canvas>
             <svg id="overlay" xmlns="http://www.w3.org/2000/svg" aria-label="切り抜き領域"></svg>
