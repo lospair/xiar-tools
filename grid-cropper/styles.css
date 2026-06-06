@@ -300,6 +300,12 @@ h2 {
   text-align: left;
 }
 
+.source-main > div {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
 .source-item.active .source-main {
   border-color: var(--accent);
   background: #eef8f6;
@@ -314,6 +320,7 @@ h2 {
 }
 
 .source-name {
+  display: block;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -322,6 +329,10 @@ h2 {
 }
 
 .source-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin-top: 3px;
   color: var(--muted);
   font-size: 11px;
