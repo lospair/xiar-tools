@@ -24,16 +24,6 @@
           自動検出
         </button>
 
-        <button id="addRegionButton" type="button" title="選択中またはいずれかの候補と同じ大きさの矩形を、空いている隣接位置へ追加します。">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z"/></svg>
-          矩形追加
-        </button>
-
-        <button id="deleteRegionButton" type="button" title="選択中の矩形候補を削除します。">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8l1 2h4v2H3V6h4l1-2Zm1 6h2v8H9v-8Zm4 0h2v8h-2v-8ZM6 10h12l-.7 10.1A2 2 0 0 1 15.3 22H8.7a2 2 0 0 1-2-1.9L6 10Z"/></svg>
-          矩形削除
-        </button>
-
         <button id="exportButton" type="button" title="共有シート、選択フォルダーへのPNG保存、ZIP保存の順に使える方法で出力します。">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 8.6 6.4 10 7.8l1-1V15h2V6.8l1 1 1.4-1.4L12 3ZM5 13h2v5h10v-5h2v5.5A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5V13Z"/></svg>
           エクスポート
@@ -56,9 +46,10 @@
           <div id="sourceList" class="source-list" aria-live="polite"></div>
         </section>
 
-        <section class="panel-section">
+        <details class="panel-section collapsible-section">
+          <summary>自動検出条件</summary>
           <div class="section-title-row">
-            <h2>検出</h2>
+            <span></span>
             <button id="detectSettingsButton" class="small-button" type="button" title="現在の検出パラメーターで再検出します。">再検出</button>
           </div>
           <div class="settings-grid">
@@ -87,7 +78,7 @@
               <input id="minAreaRatioInput" type="number" min="0" max="0.1" step="0.001" value="0.005" title="単位: 画像全体に対する比率">
             </label>
           </div>
-        </section>
+        </details>
       </aside>
 
       <section class="workspace">
@@ -100,22 +91,43 @@
             <input id="zoomInput" type="range" min="10" max="800" step="5" value="100">
           </label>
           <button id="zoomInButton" class="small-button icon-only" type="button" title="拡大">+</button>
-          <button id="pixelButton" class="small-button" type="button" aria-pressed="true" title="オンのときは拡大表示を滑らかにします。オフにするとピクセル境界をくっきり表示します。">ピクセルぼかし</button>
+          <button id="pixelButton" class="small-button" type="button" aria-pressed="false" title="オンのときは拡大表示を滑らかにします。オフにするとピクセル境界をくっきり表示します。">ピクセルぼかし</button>
           <button id="snapButton" class="small-button" type="button" aria-pressed="true" title="ハンドルのドラッグ中に、他の矩形端や分割線へ吸着します。Altキーを押している間は一時的に無効です。">スナップ</button>
         </div>
 
         <div id="viewport" class="viewport" tabindex="0" title="ホイールでズーム、ホイールボタンのドラッグでパンできます。タッチ操作では2本指でパンとズームができます。">
           <div id="stage" class="stage empty">
-            <canvas id="imageCanvas"></canvas>
+          <canvas id="imageCanvas"></canvas>
             <svg id="overlay" xmlns="http://www.w3.org/2000/svg" aria-label="切り抜き領域"></svg>
           </div>
           <canvas id="loupe" class="loupe" width="180" height="180" title="ドラッグ後のハンドルは、このズーム領域でも微調整できます。"></canvas>
+          <div id="panController" class="pan-controller" aria-label="画像移動コントローラー">
+            <button id="panUpButton" class="pan-button up" type="button" title="上へ移動" aria-label="上へ移動">▲</button>
+            <button id="panLeftButton" class="pan-button left" type="button" title="左へ移動" aria-label="左へ移動">◀</button>
+            <button id="panRightButton" class="pan-button right" type="button" title="右へ移動" aria-label="右へ移動">▶</button>
+            <button id="panDownButton" class="pan-button down" type="button" title="下へ移動" aria-label="下へ移動">▼</button>
+          </div>
         </div>
       </section>
 
       <aside class="panel region-panel">
-        <section class="panel-section">
-          <h2>選択矩形</h2>
+        <section class="panel-section region-action-section">
+          <h2>候補操作</h2>
+          <div class="region-actions">
+            <button id="addRegionButton" type="button" title="選択中またはいずれかの候補と同じ大きさの矩形を、空いている隣接位置へ追加します。">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z"/></svg>
+              矩形追加
+            </button>
+
+            <button id="deleteRegionButton" type="button" title="選択中の矩形候補を削除します。">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8l1 2h4v2H3V6h4l1-2Zm1 6h2v8H9v-8Zm4 0h2v8h-2v-8ZM6 10h12l-.7 10.1A2 2 0 0 1 15.3 22H8.7a2 2 0 0 1-2-1.9L6 10Z"/></svg>
+              矩形削除
+            </button>
+          </div>
+        </section>
+
+        <details class="panel-section collapsible-section">
+          <summary>選択矩形</summary>
           <div class="coord-grid">
             <label title="切り抜き矩形の左端です。">
               左 (px)
@@ -134,11 +146,15 @@
               <input id="hInput" type="number" min="1" step="1" title="単位: ピクセル">
             </label>
           </div>
-        </section>
+        </details>
 
         <section class="panel-section region-list-section">
           <h2 id="regionHeading">候補 0件</h2>
           <div id="regionList" class="region-list" aria-live="polite"></div>
+          <button id="exportBottomButton" class="bottom-export-button" type="button" title="共有シート、選択フォルダーへのPNG保存、ZIP保存の順に使える方法で出力します。">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 8.6 6.4 10 7.8l1-1V15h2V6.8l1 1 1.4-1.4L12 3ZM5 13h2v5h10v-5h2v5.5A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5V13Z"/></svg>
+            エクスポート
+          </button>
         </section>
       </aside>
     </main>

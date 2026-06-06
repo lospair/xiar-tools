@@ -32,7 +32,7 @@ const state = {
   currentSourceId: null,
   selectedRegionId: null,
   zoom: 1,
-  pixelated: false,
+  pixelated: true,
   snapEnabled: true,
   drag: null,
   activePointers: new Map(),
@@ -57,6 +57,7 @@ const el = {
   addRegionButton: document.getElementById("addRegionButton"),
   deleteRegionButton: document.getElementById("deleteRegionButton"),
   exportButton: document.getElementById("exportButton"),
+  exportBottomButton: document.getElementById("exportBottomButton"),
   snapButton: document.getElementById("snapButton"),
   toast: document.getElementById("toast"),
   fitButton: document.getElementById("fitButton"),
@@ -70,6 +71,10 @@ const el = {
   canvas: document.getElementById("imageCanvas"),
   overlay: document.getElementById("overlay"),
   loupe: document.getElementById("loupe"),
+  panUpButton: document.getElementById("panUpButton"),
+  panDownButton: document.getElementById("panDownButton"),
+  panLeftButton: document.getElementById("panLeftButton"),
+  panRightButton: document.getElementById("panRightButton"),
   xInput: document.getElementById("xInput"),
   yInput: document.getElementById("yInput"),
   wInput: document.getElementById("wInput"),
@@ -162,7 +167,9 @@ function showToast(message) {
 }
 
 function withDisabledExport(disabled) {
-  el.exportButton.disabled = disabled || collectEnabledRegions().length === 0;
+  const exportDisabled = disabled || collectEnabledRegions().length === 0;
+  el.exportButton.disabled = exportDisabled;
+  if (el.exportBottomButton) el.exportBottomButton.disabled = exportDisabled;
 }
 
 function renderAll() {
@@ -374,6 +381,7 @@ function renderCanvas() {
     el.stage.style.height = "480px";
     el.canvas.width = 1;
     el.canvas.height = 1;
+    el.canvas.classList.toggle("pixelated", state.pixelated);
     ctx.clearRect(0, 0, 1, 1);
     el.overlay.setAttribute("viewBox", "0 0 1 1");
     return;
@@ -382,6 +390,7 @@ function renderCanvas() {
   el.stage.classList.remove("empty");
   el.canvas.width = source.width;
   el.canvas.height = source.height;
+  el.canvas.classList.toggle("pixelated", state.pixelated);
   el.canvas.style.width = `${source.width * state.zoom}px`;
   el.canvas.style.height = `${source.height * state.zoom}px`;
   el.stage.style.width = `${source.width * state.zoom}px`;
@@ -654,6 +663,19 @@ function setZoomAt(nextZoom, clientX, clientY) {
   el.viewport.scrollLeft += stageRect.left + before.x * state.zoom - clientX;
   el.viewport.scrollTop += stageRect.top + before.y * state.zoom - clientY;
   if (state.activeHandle) drawActiveHandleLoupe(false);
+}
+
+function panViewport(dx, dy) {
+  const source = currentSource();
+  if (!source) return;
+  clearActiveHandle();
+  const stepX = Math.max(48, Math.round(el.viewport.clientWidth * 0.28));
+  const stepY = Math.max(48, Math.round(el.viewport.clientHeight * 0.28));
+  el.viewport.scrollBy({
+    left: dx * stepX,
+    top: dy * stepY,
+    behavior: "smooth"
+  });
 }
 
 function clientToImage(clientX, clientY) {
@@ -2089,6 +2111,7 @@ function registerEvents() {
   el.addRegionButton.addEventListener("click", addRegion);
   el.deleteRegionButton.addEventListener("click", deleteSelectedRegion);
   el.exportButton.addEventListener("click", exportAll);
+  if (el.exportBottomButton) el.exportBottomButton.addEventListener("click", exportAll);
   el.fitButton.addEventListener("click", fitToViewport);
   el.actualSizeButton.addEventListener("click", () => setZoom(1));
   el.zoomOutButton.addEventListener("click", () => setZoom(state.zoom / 1.25));
@@ -2103,6 +2126,10 @@ function registerEvents() {
     state.snapEnabled = !state.snapEnabled;
     updateControls();
   });
+  el.panUpButton?.addEventListener("click", () => panViewport(0, -1));
+  el.panDownButton?.addEventListener("click", () => panViewport(0, 1));
+  el.panLeftButton?.addEventListener("click", () => panViewport(-1, 0));
+  el.panRightButton?.addEventListener("click", () => panViewport(1, 0));
 
   for (const input of [el.xInput, el.yInput, el.wInput, el.hInput]) {
     input.addEventListener("change", updateSelectedFromInputs);
